@@ -74,10 +74,11 @@ class IST8310 : public LibXR::Application {
     int_drdy_->RegisterCallback(int_cb);
 
     while (!Init()) {
+      XR_LOG_ERROR("IST8310: Init failed, retrying...\r\n");
       LibXR::Thread::Sleep(100);
     }
 
-    LibXR::STDIO::Printf("IST8310: Init succeeded.\r\n");
+    XR_LOG_PASS("IST8310: Init succeeded.\r\n");
     thread_.Create(this, ThreadFunc, "ist8310_thread", task_stack_depth,
                    LibXR::Thread::Priority::REALTIME);
   }
@@ -113,7 +114,7 @@ class IST8310 : public LibXR::Application {
         sensor->TriggerMeasurement();
       } else {
         sensor->TriggerMeasurement();
-        LibXR::STDIO::Printf("IST8310: Measurement timed out.\r\n");
+        XR_LOG_WARN("IST8310: Measurement timed out.\r\n");
       }
     }
   }
@@ -159,7 +160,7 @@ class IST8310 : public LibXR::Application {
     if (std::isnan(mag_data_.x()) || std::isnan(mag_data_.y()) ||
         std::isnan(mag_data_.z()) || std::isinf(mag_data_.x()) ||
         std::isinf(mag_data_.y()) || std::isinf(mag_data_.z())) {
-      LibXR::STDIO::Printf("IST8310: NaN or Inf detected.\r\n");
+      XR_LOG_WARN("IST8310: NaN or Inf detected.\r\n");
     }
   }
 
