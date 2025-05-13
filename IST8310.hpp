@@ -65,7 +65,7 @@ class IST8310 : public LibXR::Application {
     hw.template FindOrExit<LibXR::RamFS>({"ramfs"})->Add(cmd_file_);
 
     int_drdy_->DisableInterrupt();
-    auto int_cb = LibXR::Callback<>::Create(
+    auto int_cb = LibXR::GPIO::Callback::Create(
         [](bool in_isr, IST8310 *sensor) {
           sensor->new_data_.PostFromCallback(in_isr);
         },
@@ -198,7 +198,6 @@ class IST8310 : public LibXR::Application {
   LibXR::WriteOperation op_i2c_write_;
 
   uint8_t read_buffer_[IST8310_MAG_RX_LEN] = {};
-  uint8_t write_buffer_[2] = {};
 
   LibXR::RamFS::File cmd_file_;
   LibXR::Thread thread_;
