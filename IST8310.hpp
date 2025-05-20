@@ -11,7 +11,7 @@ constructor_args:
       y: 0.0
       z: 0.0
   - topic_name: "ist8310_mag"
-  - task_stack_depth: 384
+  - task_stack_depth: 1536
 required_hardware: i2c_ist8310 ist8310_int ist8310_rst ramfs
 repository: https://github.com/xrobot-org/IST8310
 === END MANIFEST === */
