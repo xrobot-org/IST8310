@@ -1,8 +1,7 @@
 #pragma once
 
 // clang-format off
-/* === MODULE MANIFEST ===
-module_name: IST8310
+/* === MODULE MANIFEST V2 ===
 module_description: iSentek IST8310 三轴磁力计驱动模块 / Driver module for iSentek IST8310 3-axis magnetometer
 constructor_args:
   - rotation:
@@ -12,8 +11,9 @@ constructor_args:
       z: 0.0
   - topic_name: "ist8310_mag"
   - task_stack_depth: 1536
+template_args: []
 required_hardware: i2c_ist8310 ist8310_int ist8310_rst ramfs
-repository: https://github.com/xrobot-org/IST8310
+depends: []
 === END MANIFEST === */
 // clang-format on
 
