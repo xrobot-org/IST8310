@@ -50,8 +50,8 @@ depends: []
 
 class IST8310 : public LibXR::Application {
  public:
-  IST8310(LibXR::HardwareContainer &hw, LibXR::ApplicationManager &app,
-          LibXR::Quaternion<float> &&rotation, const char *topic_name,
+  IST8310(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
+          LibXR::Quaternion<float>&& rotation, const char* topic_name,
           size_t task_stack_depth)
       : rotation_(std::move(rotation)),
         topic_mag_(topic_name, sizeof(mag_data_)),
@@ -66,7 +66,7 @@ class IST8310 : public LibXR::Application {
 
     int_drdy_->DisableInterrupt();
     auto int_cb = LibXR::GPIO::Callback::Create(
-        [](bool in_isr, IST8310 *sensor) {
+        [](bool in_isr, IST8310* sensor) {
           sensor->new_data_.PostFromCallback(in_isr);
         },
         this);
@@ -103,7 +103,7 @@ class IST8310 : public LibXR::Application {
     return true;
   }
 
-  static void ThreadFunc(IST8310 *sensor) {
+  static void ThreadFunc(IST8310* sensor) {
     sensor->TriggerMeasurement();
     while (true) {
       if (sensor->new_data_.Wait(100) == ErrorCode::OK) {
@@ -163,7 +163,7 @@ class IST8310 : public LibXR::Application {
     }
   }
 
-  static int CommandFunc(IST8310 *sensor, int argc, char **argv) {
+  static int CommandFunc(IST8310* sensor, int argc, char** argv) {
     if (argc == 1) {
       LibXR::STDIO::Printf("Usage:\r\n");
       LibXR::STDIO::Printf(
@@ -191,7 +191,7 @@ class IST8310 : public LibXR::Application {
   LibXR::Topic topic_mag_;
 
   LibXR::GPIO *int_drdy_, *reset_;
-  LibXR::I2C *i2c_;
+  LibXR::I2C* i2c_;
 
   LibXR::Semaphore sem_i2c_, new_data_;
   LibXR::ReadOperation op_i2c_read_;
