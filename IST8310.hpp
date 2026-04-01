@@ -44,7 +44,7 @@ depends: []
 
 #define IST8310_WHO_AM_I_RESPONSE (0x10)
 
-#define IST8310_I2C_ADDR (0x0E << 1)  // Default 7-bit address
+#define IST8310_I2C_ADDR (0x0E)  // Default 7-bit address, no R/W bit
 
 #define IST8310_MAG_RX_LEN (6)
 
