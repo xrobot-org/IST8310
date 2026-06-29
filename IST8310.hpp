@@ -54,7 +54,7 @@ class IST8310 : public LibXR::Application {
           LibXR::Quaternion<float>&& rotation, const char* topic_name,
           size_t task_stack_depth)
       : rotation_(std::move(rotation)),
-        topic_mag_(topic_name, sizeof(mag_data_)),
+        topic_mag_(LibXR::Topic::CreateTopic<decltype(mag_data_)>(topic_name)),
         int_drdy_(hw.template FindOrExit<LibXR::GPIO>({"ist8310_int"})),
         reset_(hw.template FindOrExit<LibXR::GPIO>({"ist8310_rst"})),
         i2c_(hw.template FindOrExit<LibXR::I2C>({"i2c_ist8310"})),
