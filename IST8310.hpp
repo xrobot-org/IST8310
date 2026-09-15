@@ -2,25 +2,19 @@
 
 // clang-format off
 /* === MODULE MANIFEST V2 ===
-module_description: iSentek IST8310 三轴磁力计驱动模块 / Driver module for iSentek IST8310 3-axis magnetometer
-constructor_args:
-  - rotation:
-      w: 1.0
-      x: 0.0
-      y: 0.0
-      z: 0.0
-  - topic_name: "ist8310_mag"
-  - task_stack_depth: 1536
-template_args: []
-required_hardware: i2c_ist8310 ist8310_int ist8310_rst ramfs
+module_description: iSentek IST8310 三轴磁力计驱动模块 / Driver module for iSentek IST8310
+  3-axis magnetometer
 depends: []
 === END MANIFEST === */
 // clang-format on
 
-#include "app_framework.hpp"
+#include <memory>
+
 #include "gpio.hpp"
 #include "i2c.hpp"
 #include "message.hpp"
+#include "ramfs.hpp"
+#include "thread.hpp"
 #include "transform.hpp"
 
 #define IST8310_REG_WHO_AM_I (0x00)
@@ -48,31 +42,32 @@ depends: []
 
 #define IST8310_MAG_RX_LEN (6)
 
-class IST8310 : public LibXR::Application {
+class IST8310
+{
  public:
-  IST8310(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
+  IST8310(LibXR::GPIO& external_ist8310_int, LibXR::GPIO& external_ist8310_rst,
+          LibXR::I2C& external_i2c_ist8310, LibXR::RamFS& external_ramfs,
           LibXR::Quaternion<float>&& rotation, const char* topic_name,
           size_t task_stack_depth)
       : rotation_(std::move(rotation)),
         topic_mag_(LibXR::Topic::CreateTopic<decltype(mag_data_)>(topic_name)),
-        int_drdy_(hw.template FindOrExit<LibXR::GPIO>({"ist8310_int"})),
-        reset_(hw.template FindOrExit<LibXR::GPIO>({"ist8310_rst"})),
-        i2c_(hw.template FindOrExit<LibXR::I2C>({"i2c_ist8310"})),
+        int_drdy_(std::addressof(external_ist8310_int)),
+        reset_(std::addressof(external_ist8310_rst)),
+        i2c_(std::addressof(external_i2c_ist8310)),
         op_i2c_read_(sem_i2c_),
         op_i2c_write_(sem_i2c_),
-        cmd_file_(LibXR::RamFS::CreateFile("ist8310", CommandFunc, this)) {
-    app.Register(*this);
-    hw.template FindOrExit<LibXR::RamFS>({"ramfs"})->Add(cmd_file_);
+        cmd_file_(LibXR::RamFS::CreateFile("ist8310", CommandFunc, this))
+  {
+    external_ramfs.Add(cmd_file_);
 
     int_drdy_->DisableInterrupt();
     auto int_cb = LibXR::GPIO::Callback::Create(
-        [](bool in_isr, IST8310* sensor) {
-          sensor->new_data_.PostFromCallback(in_isr);
-        },
+        [](bool in_isr, IST8310* sensor) { sensor->new_data_.PostFromCallback(in_isr); },
         this);
     int_drdy_->RegisterCallback(int_cb);
 
-    while (!Init()) {
+    while (!Init())
+    {
       XR_LOG_ERROR("IST8310: Init failed, retrying...\r\n");
       LibXR::Thread::Sleep(100);
     }
@@ -82,13 +77,15 @@ class IST8310 : public LibXR::Application {
                    LibXR::Thread::Priority::REALTIME);
   }
 
-  bool Init() {
+  bool Init()
+  {
     reset_->Write(false);
     LibXR::Thread::Sleep(50);
     reset_->Write(true);
     LibXR::Thread::Sleep(50);
 
-    if (ReadReg(IST8310_REG_WHO_AM_I) != IST8310_WHO_AM_I_RESPONSE) {
+    if (ReadReg(IST8310_REG_WHO_AM_I) != IST8310_WHO_AM_I_RESPONSE)
+    {
       return false;
     }
 
@@ -103,80 +100,99 @@ class IST8310 : public LibXR::Application {
     return true;
   }
 
-  static void ThreadFunc(IST8310* sensor) {
+  static void ThreadFunc(IST8310* sensor)
+  {
     sensor->TriggerMeasurement();
-    while (true) {
-      if (sensor->new_data_.Wait(100) == LibXR::ErrorCode::OK) {
+    while (true)
+    {
+      if (sensor->new_data_.Wait(100) == LibXR::ErrorCode::OK)
+      {
         sensor->ReadMagnetometer();
         sensor->ParseMagData();
         sensor->topic_mag_.Publish(sensor->mag_data_);
         sensor->TriggerMeasurement();
-      } else {
+      }
+      else
+      {
         sensor->TriggerMeasurement();
         XR_LOG_WARN("IST8310: Measurement timed out.\r\n");
       }
     }
   }
 
-  void TriggerMeasurement() {
+  void TriggerMeasurement()
+  {
     WriteReg(IST8310_REG_CNTL1, 0x01);  // Single measurement mode
   }
 
-  void ReadMagnetometer() {
-    i2c_->MemRead(IST8310_I2C_ADDR, IST8310_REG_DATAXL, read_buffer_,
-                  op_i2c_read_);
+  void ReadMagnetometer()
+  {
+    i2c_->MemRead(IST8310_I2C_ADDR, IST8310_REG_DATAXL, read_buffer_, op_i2c_read_);
   }
 
-  void ParseMagData() {
+  void ParseMagData()
+  {
     std::array<int16_t, 3> raw;
-    for (int i = 0; i < 3; ++i) {
-      raw[i] = static_cast<int16_t>((read_buffer_[i * 2 + 1] << 8) |
-                                    read_buffer_[i * 2]);
+    for (int i = 0; i < 3; ++i)
+    {
+      raw[i] = static_cast<int16_t>((read_buffer_[i * 2 + 1] << 8) | read_buffer_[i * 2]);
     }
 
-    if (raw[0] == 0 && raw[1] == 0 && raw[2] == 0) {
+    if (raw[0] == 0 && raw[1] == 0 && raw[2] == 0)
+    {
       return;
     }
 
     Eigen::Matrix<float, 3, 1> vec;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
+    {
       vec[i] = static_cast<float>(raw[i]) * IST8310_MAG_SEN;
     }
     mag_data_ = rotation_ * vec;
   }
 
-  uint8_t ReadReg(uint8_t reg) {
+  uint8_t ReadReg(uint8_t reg)
+  {
     uint8_t data = 0;
     i2c_->MemRead(IST8310_I2C_ADDR, reg, data, op_i2c_read_);
     return data;
   }
 
-  void WriteReg(uint8_t reg, uint8_t val) {
+  void WriteReg(uint8_t reg, uint8_t val)
+  {
     i2c_->MemWrite(IST8310_I2C_ADDR, reg, val, op_i2c_write_);
   }
 
-  void OnMonitor(void) override {
+  void OnMonitor(void)
+  {
     if (std::isnan(mag_data_.x()) || std::isnan(mag_data_.y()) ||
         std::isnan(mag_data_.z()) || std::isinf(mag_data_.x()) ||
-        std::isinf(mag_data_.y()) || std::isinf(mag_data_.z())) {
+        std::isinf(mag_data_.y()) || std::isinf(mag_data_.z()))
+    {
       XR_LOG_WARN("IST8310: NaN or Inf detected.\r\n");
     }
   }
 
-  static int CommandFunc(IST8310* sensor, int argc, char** argv) {
-    if (argc == 1) {
+  static int CommandFunc(IST8310* sensor, int argc, char** argv)
+  {
+    if (argc == 1)
+    {
       LibXR::STDIO::Printf<"Usage:\r\n">();
-      LibXR::STDIO::Printf<"  show [time_ms] [interval_ms] - Print sensor data "
+      LibXR::STDIO::Printf<
+          "  show [time_ms] [interval_ms] - Print sensor data "
           "periodically.\r\n">();
-    } else if (argc == 4) {
-      if (strcmp(argv[1], "show") == 0) {
+    }
+    else if (argc == 4)
+    {
+      if (strcmp(argv[1], "show") == 0)
+      {
         int time_ms = atoi(argv[2]);
         int interval_ms = atoi(argv[3]);
-        for (int i = 0; i < time_ms / interval_ms; i++) {
+        for (int i = 0; i < time_ms / interval_ms; i++)
+        {
           LibXR::Thread::Sleep(interval_ms);
           LibXR::STDIO::Printf<"Mag: x=%f, y=%f, z=%f\r\n">(
-                               sensor->mag_data_.x(), sensor->mag_data_.y(),
-                               sensor->mag_data_.z());
+              sensor->mag_data_.x(), sensor->mag_data_.y(), sensor->mag_data_.z());
         }
       }
     }
