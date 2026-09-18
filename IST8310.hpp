@@ -45,20 +45,24 @@ depends: []
 class IST8310
 {
  public:
-  IST8310(LibXR::GPIO& external_ist8310_int, LibXR::GPIO& external_ist8310_rst,
-          LibXR::I2C& external_i2c_ist8310, LibXR::RamFS& external_ramfs,
-          LibXR::Quaternion<float>&& rotation, const char* topic_name,
-          size_t task_stack_depth)
+  IST8310(
+      LibXR::GPIO& interrupt,
+      LibXR::GPIO& rst,
+      LibXR::I2C& i2c,
+      LibXR::RamFS& ramfs,
+      LibXR::Quaternion<float>&& rotation = {1.0f, 0.0f, 0.0f, 0.0f},
+      const char* topic_name = "ist8310_mag",
+      size_t task_stack_depth = 1536)
       : rotation_(std::move(rotation)),
         topic_mag_(LibXR::Topic::CreateTopic<decltype(mag_data_)>(topic_name)),
-        int_drdy_(std::addressof(external_ist8310_int)),
-        reset_(std::addressof(external_ist8310_rst)),
-        i2c_(std::addressof(external_i2c_ist8310)),
+        int_drdy_(std::addressof(interrupt)),
+        reset_(std::addressof(rst)),
+        i2c_(std::addressof(i2c)),
         op_i2c_read_(sem_i2c_),
         op_i2c_write_(sem_i2c_),
         cmd_file_(LibXR::RamFS::CreateFile("ist8310", CommandFunc, this))
   {
-    external_ramfs.Add(cmd_file_);
+    ramfs.Add(cmd_file_);
 
     int_drdy_->DisableInterrupt();
     auto int_cb = LibXR::GPIO::Callback::Create(
