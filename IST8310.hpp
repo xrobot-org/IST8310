@@ -2,8 +2,7 @@
 
 // clang-format off
 /* === MODULE MANIFEST V2 ===
-module_description: iSentek IST8310 三轴磁力计驱动模块 / Driver module for iSentek IST8310
-  3-axis magnetometer
+module_description: iSentek IST8310 三轴磁力计（I2C）驱动模块 / Driver Module for the iSentek IST8310 3-axis magnetometer over I2C
 depends: []
 === END MANIFEST === */
 // clang-format on
