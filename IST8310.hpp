@@ -33,17 +33,47 @@ depends: []
 #define IST8310_REG_AVGCNTL (0x41)
 #define IST8310_REG_PDCNTL (0x42)
 
+/// 磁场灵敏度 (µT/LSB)
+/// Magnetic sensitivity (µT/LSB)
 #define IST8310_MAG_SEN (0.3f)
 
 #define IST8310_WHO_AM_I_RESPONSE (0x10)
 
-#define IST8310_I2C_ADDR (0x0E)  // Default 7-bit address, no R/W bit
+/// 默认 7 位 I2C 地址，不含读写位
+/// Default 7-bit I2C address without the R/W bit
+#define IST8310_I2C_ADDR (0x0E)
 
 #define IST8310_MAG_RX_LEN (6)
 
+/**
+ * @brief IST8310 三轴磁力计驱动模块，采集磁场并发布到 Topic。
+ *        Driver Module for the IST8310 3-axis magnetometer; it samples the magnetic
+ *        field and publishes it to a Topic.
+ */
 class IST8310
 {
  public:
+  /**
+   * @brief 构造 IST8310：注册 DRDY 中断与 RamFS 命令，初始化芯片，创建采集线程。
+   *        Construct IST8310: register the DRDY interrupt and the RamFS command,
+   *        initialize the chip, and create the acquisition thread.
+   *
+   * @param interrupt 连接 DRDY 引脚的中断 GPIO。
+   *                  Interrupt GPIO connected to the DRDY pin.
+   * @param rst 连接复位引脚的输出 GPIO。
+   *            Output GPIO connected to the reset pin.
+   * @param i2c 芯片所在的 I2C。
+   *            I2C bus of the chip.
+   * @param ramfs 接收 `ist8310` 命令的 RamFS。
+   *              RamFS that receives the `ist8310` command.
+   * @param rotation 传感器坐标系到应用坐标系的四元数 (w, x, y, z)。
+   *                 Quaternion (w, x, y, z) from the sensor frame to the application
+   *                 frame.
+   * @param topic_name 发布磁场数据的 Topic 名称。
+   *                   Name of the Topic that publishes the magnetic field.
+   * @param task_stack_depth 采集线程栈深。
+   *                         Stack depth of the acquisition thread.
+   */
   IST8310(
       LibXR::GPIO& interrupt,
       LibXR::GPIO& rst,
@@ -80,6 +110,14 @@ class IST8310
                    LibXR::Thread::Priority::REALTIME);
   }
 
+  /**
+   * @brief 复位芯片，校验 WHO_AM_I，并配置 DRDY、平均次数与单次测量模式。
+   *        Reset the chip, check WHO_AM_I, and configure DRDY, the averaging and the
+   *        single-measurement mode.
+   *
+   * @return 初始化成功返回 true，WHO_AM_I 不符时返回 false。
+   *         True on success, false when WHO_AM_I does not match.
+   */
   bool Init()
   {
     reset_->Write(false);
@@ -103,6 +141,14 @@ class IST8310
     return true;
   }
 
+  /**
+   * @brief 采集线程：触发单次测量，等待 DRDY 中断，读取并发布磁场。
+   *        Acquisition thread: trigger a single measurement, wait for the DRDY
+   *        interrupt, then read and publish the magnetic field.
+   *
+   * @param sensor IST8310 实例。
+   *               IST8310 instance.
+   */
   static void ThreadFunc(IST8310* sensor)
   {
     sensor->TriggerMeasurement();
@@ -123,16 +169,29 @@ class IST8310
     }
   }
 
+  /**
+   * @brief 触发一次单次测量。
+   *        Trigger one single measurement.
+   */
   void TriggerMeasurement()
   {
     WriteReg(IST8310_REG_CNTL1, 0x01);  // Single measurement mode
   }
 
+  /**
+   * @brief 读取 6 字节原始磁场数据到内部缓冲区。
+   *        Read the 6 raw magnetic-field bytes into the internal buffer.
+   */
   void ReadMagnetometer()
   {
     i2c_->MemRead(IST8310_I2C_ADDR, IST8310_REG_DATAXL, read_buffer_, op_i2c_read_);
   }
 
+  /**
+   * @brief 解析缓冲区中的原始数据，换算为 µT 并乘以 rotation；原始值全为 0 时不更新。
+   *        Parse the raw data in the buffer, convert it to µT and multiply by rotation;
+   *        the output is not updated when all raw values are 0.
+   */
   void ParseMagData()
   {
     std::array<int16_t, 3> raw;
@@ -154,6 +213,15 @@ class IST8310
     mag_data_ = rotation_ * vec;
   }
 
+  /**
+   * @brief 读一个寄存器。
+   *        Read one register.
+   *
+   * @param reg 寄存器地址。
+   *            Register address.
+   * @return 寄存器的值。
+   *         Register value.
+   */
   uint8_t ReadReg(uint8_t reg)
   {
     uint8_t data = 0;
@@ -161,11 +229,24 @@ class IST8310
     return data;
   }
 
+  /**
+   * @brief 写一个寄存器。
+   *        Write one register.
+   *
+   * @param reg 寄存器地址。
+   *            Register address.
+   * @param val 写入的值。
+   *            Value to write.
+   */
   void WriteReg(uint8_t reg, uint8_t val)
   {
     i2c_->MemWrite(IST8310_I2C_ADDR, reg, val, op_i2c_write_);
   }
 
+  /**
+   * @brief 监控回调：数据含 NaN 或 Inf 时输出警告。
+   *        Monitor callback: log a warning when the data contains NaN or Inf.
+   */
   void OnMonitor(void)
   {
     if (std::isnan(mag_data_.x()) || std::isnan(mag_data_.y()) ||
@@ -176,6 +257,19 @@ class IST8310
     }
   }
 
+  /**
+   * @brief RamFS 命令 `ist8310`：周期打印磁场数据。
+   *        RamFS command `ist8310`: print the magnetic field periodically.
+   *
+   * @param sensor IST8310 实例。
+   *               IST8310 instance.
+   * @param argc 参数个数。
+   *             Argument count.
+   * @param argv 参数列表。
+   *             Argument list.
+   * @return 命令处理完成后返回 0。
+   *         0 after the command is processed.
+   */
   static int CommandFunc(IST8310* sensor, int argc, char** argv)
   {
     if (argc == 1)
