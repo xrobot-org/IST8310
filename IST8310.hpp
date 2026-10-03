@@ -7,6 +7,9 @@ depends: []
 === END MANIFEST === */
 // clang-format on
 
+#include <array>
+#include <cmath>
+#include <cstring>
 #include <memory>
 
 #include "gpio.hpp"
