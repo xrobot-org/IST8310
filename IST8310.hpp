@@ -307,7 +307,7 @@ class IST8310
 
  private:
   LibXR::Quaternion<float> rotation_;
-  Eigen::Matrix<float, 3, 1> mag_data_;
+  Eigen::Matrix<float, 3, 1> mag_data_ = Eigen::Matrix<float, 3, 1>::Zero();
   LibXR::Topic topic_mag_;
 
   LibXR::GPIO *int_drdy_, *reset_;

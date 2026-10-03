@@ -4,7 +4,7 @@ iSentek IST8310 三轴磁力计（I2C）驱动模块 / Driver Module for the iSe
 
 ## 1. 模块作用 / Purpose
 
-构造时，IST8310 复位芯片（`rst` 拉低 50 ms 再拉高），通过 I2C（7 位地址 `0x0E`）读取 `WHO_AM_I`（期望 `0x10`），并配置 DRDY 低电平有效、2 次平均、单次测量模式；初始化失败时每 100 ms 重试，直到成功。随后创建线程 `ist8310_thread`（REALTIME 优先级）：每次触发一次单次测量，等待 DRDY 中断（超时 100 ms 则输出警告并重新触发），读取 6 字节原始数据，乘以 0.3（`IST8310_MAG_SEN`，µT/LSB），经 `rotation` 旋转后发布。原始值全为 0 的样本被丢弃，此时重新发布上一次的值。
+构造时，IST8310 复位芯片（`rst` 拉低 50 ms 再拉高），通过 I2C（7 位地址 `0x0E`）读取 `WHO_AM_I`（期望 `0x10`），并配置 DRDY 低电平有效、2 次平均、单次测量模式；初始化失败时每 100 ms 重试，直到成功。随后创建线程 `ist8310_thread`（REALTIME 优先级）：每次触发一次单次测量，等待 DRDY 中断（超时 100 ms 则输出警告并重新触发），读取 6 字节原始数据，乘以 0.3（`IST8310_MAG_SEN`，µT/LSB），经 `rotation` 旋转后发布。原始值全为 0 的样本被丢弃，此时重新发布上一次的值（尚无有效样本时为零向量）。
 
 `OnMonitor()` 在数据出现 NaN 或 Inf 时输出警告。
 
@@ -13,7 +13,7 @@ iSentek IST8310 三轴磁力计（I2C）驱动模块 / Driver Module for the iSe
 - `ist8310`：打印用法。
 - `ist8310 show <time_ms> <interval_ms>`：在 `time_ms` 内每隔 `interval_ms` 打印一次磁场。
 
-Upon construction, IST8310 resets the chip (`rst` low for 50 ms, then high), reads `WHO_AM_I` over I2C (7-bit address `0x0E`, expects `0x10`) and configures DRDY active low, 2x averaging and single-measurement mode; on failure it retries every 100 ms until it succeeds. It then creates the thread `ist8310_thread` (REALTIME priority): it triggers one single measurement, waits for the DRDY interrupt (on a 100 ms timeout it logs a warning and triggers again), reads the 6 raw bytes, scales them by 0.3 (`IST8310_MAG_SEN`, µT/LSB), rotates the vector by `rotation` and publishes it. A sample whose raw values are all zero is discarded and the previous value is published again.
+Upon construction, IST8310 resets the chip (`rst` low for 50 ms, then high), reads `WHO_AM_I` over I2C (7-bit address `0x0E`, expects `0x10`) and configures DRDY active low, 2x averaging and single-measurement mode; on failure it retries every 100 ms until it succeeds. It then creates the thread `ist8310_thread` (REALTIME priority): it triggers one single measurement, waits for the DRDY interrupt (on a 100 ms timeout it logs a warning and triggers again), reads the 6 raw bytes, scales them by 0.3 (`IST8310_MAG_SEN`, µT/LSB), rotates the vector by `rotation` and publishes it. A sample whose raw values are all zero is discarded and the previous value is published again (a zero vector while no valid sample has been received).
 
 `OnMonitor()` logs a warning when the data contains NaN or Inf.
 
