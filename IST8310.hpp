@@ -270,8 +270,8 @@ class IST8310
    *             Argument count.
    * @param argv 参数列表。
    *             Argument list.
-   * @return 命令处理完成后返回 0。
-   *         0 after the command is processed.
+   * @return 成功为 0，interval_ms 不大于 0 为 -1。
+   *         0 on success, -1 when interval_ms is not greater than 0.
    */
   static int CommandFunc(IST8310* sensor, int argc, char** argv)
   {
@@ -288,6 +288,11 @@ class IST8310
       {
         int time_ms = atoi(argv[2]);
         int interval_ms = atoi(argv[3]);
+        if (interval_ms <= 0)
+        {
+          LibXR::STDIO::Printf<"Error: interval_ms must be greater than 0.\r\n">();
+          return -1;
+        }
         for (int i = 0; i < time_ms / interval_ms; i++)
         {
           LibXR::Thread::Sleep(interval_ms);
