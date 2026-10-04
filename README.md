@@ -34,7 +34,7 @@ IST8310(LibXR::GPIO& interrupt, LibXR::GPIO& rst, LibXR::I2C& i2c,
 
 依赖：
 
-- `interrupt`：连接 DRDY 引脚的中断 GPIO，取自 BSP 的硬件注册（`XR_REGISTER`）。
+- `interrupt`：连接 DRDY 引脚的中断 GPIO，DRDY 低电平有效，由 BSP 配置为下降沿中断，取自 BSP 的硬件注册（`XR_REGISTER`）。
 - `rst`：连接复位引脚的输出 GPIO，取自 BSP 的硬件注册。
 - `i2c`：芯片所在的 `LibXR::I2C` 总线，取自 BSP 的硬件注册。
 - `ramfs`：注册 `ist8310` 命令的 `LibXR::RamFS`，取自 BSP 的硬件注册。
@@ -43,11 +43,11 @@ IST8310(LibXR::GPIO& interrupt, LibXR::GPIO& rst, LibXR::I2C& i2c,
 
 - `rotation`：传感器坐标系到应用坐标系的四元数 `{w, x, y, z}`，默认单位四元数。
 - `topic_name`：发布磁场数据的 Topic 名称，默认 `"ist8310_mag"`。
-- `task_stack_depth`：采集线程栈深，默认 1536。
+- `task_stack_depth`：采集线程栈深，单位字节，默认 1536。
 
 Dependencies:
 
-- `interrupt`: interrupt GPIO connected to the DRDY pin, taken from the BSP's Registration (`XR_REGISTER`).
+- `interrupt`: interrupt GPIO connected to the DRDY pin; DRDY is active low and the BSP configures the GPIO as a falling-edge interrupt; taken from the BSP's Registration (`XR_REGISTER`).
 - `rst`: output GPIO connected to the reset pin, taken from the BSP's Registration.
 - `i2c`: the `LibXR::I2C` bus of the chip, taken from the BSP's Registration.
 - `ramfs`: the `LibXR::RamFS` that receives the `ist8310` command, taken from the BSP's Registration.
@@ -56,7 +56,7 @@ Configuration parameters:
 
 - `rotation`: quaternion `{w, x, y, z}` from the sensor frame to the application frame, default identity.
 - `topic_name`: name of the published magnetic-field Topic, default `"ist8310_mag"`.
-- `task_stack_depth`: stack depth of the acquisition thread, default 1536.
+- `task_stack_depth`: stack depth of the acquisition thread in bytes, default 1536.
 
 ## 3. Topic
 
